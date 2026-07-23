@@ -3,14 +3,29 @@ import polars as pl
 from comorbidipy import comorbidity
 
 
-def build_readmission_label(admissions):
+def admission_features(admissions):
+    #Readmission label
     admissions['admittime'] = pd.to_datetime(admissions['admittime'])
     admissions['dischtime'] = pd.to_datetime(admissions['dischtime'])
     admissions = admissions.sort_values(['subject_id', 'admittime'])
     admissions['next_admittime'] = admissions.groupby('subject_id')['admittime'].shift(-1)
     admissions['days_to_next'] = (admissions['next_admittime'] - admissions['dischtime']).dt.days
     admissions['readmitted_30'] = (admissions['days_to_next'] <= 30).astype(int)
+
+    # Remove admissions who die as they will not be readmitted and will cause data leak (model gaining access to information it won't have in a real environment)
     admissions = admissions[admissions['discharge_location'] != 'DIED']
+
+    # length of stay
+    admissions["length"] = admissions["dischtime"] - admissions["admittime"]
+    admissions["length"] = admissions["length"] / pd.Timedelta(days=1)
+
+    # number of previous admissions
+    admissions['No_of_admission'] = admissions.groupby('subject_id')['hadm_id'].transform('count')
+
+    #date since last admission
+    admissions = admissions.sort_values(['subject_id', 'admittime'])
+    admissions['last_admission'] = admissions.groupby('subject_id')['admittime'].shift(1)
+
     return admissions
 
 
@@ -40,7 +55,7 @@ def build_comorbidities(diagnoses):
 
 
 def preprocess(admissions, patients, diagnoses):
-    df = build_readmission_label(admissions)
+    df = admission_features(admissions)
     df = df.merge(patients, on='subject_id', how='left')
     comorbidities = build_comorbidities(diagnoses)
     df = df.merge(comorbidities, on='hadm_id', how='left')
