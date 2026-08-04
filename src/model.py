@@ -10,22 +10,36 @@ import os
 
 FEATURES = [
     'anchor_age', 'gender', 'admission_type', 'admission_location',
-    'discharge_location', 'insurance', 'metacanc', 'carit', 'obes',
+    'insurance', 'metacanc', 'carit', 'obes',
     'pvd', 'depre', 'solidtum', 'rheumd', 'diabc', 'ld', 'aids',
     'dane', 'drug', 'pud', 'hypunc', 'rf', 'diabunc', 'hypothy',
     'cpd', 'lymph', 'ond', 'wloss', 'coag', 'hypc', 'fed', 'pcd',
-    'chf', 'valv', 'psycho', 'alcohol', 'blane', 'comorbidity_score'
+    'chf', 'valv', 'psycho', 'alcohol', 'blane', 'comorbidity_score',
+    'No_of_admission', 'days_since_last',
+    'prev_length', 'prev_num_procedures', 'prev_num_medications',
+    'prev_num_abnormal_labs'
 ]
 
-CAT_COLS = ['gender', 'admission_type', 'admission_location', 'discharge_location', 'insurance']
+CAT_COLS = ['gender', 'admission_type', 'admission_location', 'insurance']
 
 
 def prepare_features(df):
     X = df[FEATURES].copy()
+
+    # create is_first_admission from days_since_last before filling
+    X['is_first_admission'] = X['days_since_last'].isna().astype(int)
+    X['days_since_last'] = X['days_since_last'].fillna(-1)
+
+    X['prev_length'] = X['prev_length'].fillna(0)
+    X['prev_num_procedures'] = X['prev_num_procedures'].fillna(0)
+    X['prev_num_medications'] = X['prev_num_medications'].fillna(0)
+    X['prev_num_abnormal_labs'] = X['prev_num_abnormal_labs'].fillna(0)
+
     X = pd.get_dummies(X, columns=CAT_COLS)
     X = X.fillna(0)
     y = df['readmitted_30']
     return X, y
+
 
 def train(df,test_size=0.2,random_state=None, model=None):
     X, y = prepare_features(df)
